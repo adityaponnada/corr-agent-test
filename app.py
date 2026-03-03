@@ -1,79 +1,73 @@
 import streamlit as st
-import pandas as pd
 import os
-from langchain_google_genai import ChatGoogleGenerativeAI
-from dotenv import load_dotenv
-from agent import run_agent, execute_python, calculate_correlation, inspect_data, SYSTEM_PROMPT
-from langchain_core.messages import SystemMessage
+import time
+from inspector_agent import run_inspector
+from statistician_agent import run_statistician
+from plotter_agent import run_plotter
 
-# 1. Setup & Configuration
-load_dotenv()
-st.set_page_config(page_title="Research RA: EDA Agent", layout="wide")
+st.title("🧪 Multi-Agent Research Lab")
 
-# Initialize the LLM (Using your verified Tier 1 Key logic)
-llm = ChatGoogleGenerativeAI(
-    model="gemini-2.5-flash", 
-    google_api_key=os.getenv("GOOGLE_API_KEY")
-)
+# Setup Sidebar & File Upload
+uploaded_file = st.sidebar.file_uploader("Upload CSV", type="csv")
+if uploaded_file:
+    with open("data.csv", "wb") as f:
+        f.write(uploaded_file.getbuffer())
 
-# 2. State Management (The "Memory")
-# 1. PERSISTENCE: This is the secret sauce
-if "chat_history" not in st.session_state:
-    # Initialize with your System Prompt
-    st.session_state.chat_history = [SystemMessage(content=SYSTEM_PROMPT)]
+# initialize UI chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-if "ui_messages" not in st.session_state:
-    st.session_state.ui_messages = []
+# Display existing chat history
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+        if "image" in msg:
+            st.image(msg["image"])
 
-# 3. Sidebar: File Upload
-with st.sidebar:
-    st.title("📂 Data Portal")
-    uploaded_file = st.file_uploader("Upload your CSV", type="csv")
-    if uploaded_file:
-        df = pd.read_csv(uploaded_file)
-        st.write("### Data Preview", df.head())
-        # Save locally so the agent's python_executor can find it
-        df.to_csv("active_data.csv", index=False)
-
-# 4. The Chat Interface
-st.title("🤖 Research RA")
-st.caption("Autonomous EDA Agent powered by Gemini & Python Executor")
-
-# Display chat history from session state
-for message in st.session_state.ui_messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# 5. The Input Loop
-if prompt := st.chat_input("Ask me to analyze your data..."):
-    # Add user message to UI
-    st.session_state.ui_messages.append({"role": "user", "content": prompt})
+if prompt := st.chat_input("Start analysis..."):
+    # 1. User Message
+    st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Trigger the Agent Logic
+    # 2. Assistant Response (The Relay)
     with st.chat_message("assistant"):
-        with st.status("🧠 Thinking...", expanded=True) as status:
-            # Here you would call your 'run_agent' function
-            # For now, let's simulate the 'Thought' and 'Action'
-            # st.write("Checking data structure...")
-            final_answer, updated_history = run_agent(prompt, "active_data.csv", st.session_state.chat_history)
-            st.session_state.chat_history = updated_history
-
-            if os.path.exists("temp_plot.png"):
-                st.image("temp_plot.png", caption="Generated Visualization")
-                # Move it to a session folder or delete it to avoid ghosting
-                os.rename("temp_plot.png", f"plot_{len(st.session_state.ui_messages)}.png")
-            status.update(label="✅ Analysis Complete", state="complete")
-            
-            # --- AGENT EXECUTION LOGIC GOES HERE ---
-            # You would use the 'execute_python' tool we built
-            # result = run_agent(prompt, "active_data.csv", st.session_state.chat_history)
-            # ---------------------------------------
-            
-            final_response = st.session_state.chat_history[-1].content
-            st.markdown(final_response)
-            st.session_state.ui_messages.append({"role": "assistant", "content": final_response})
+        # STEP 1: INSPECTOR
+        with st.status("🕵️ Inspector is checking data...", expanded=False):
+            inspect_report = run_inspector("data.csv", prompt)
+            st.write(inspect_report)
         
-        # st.markdown(response)
-        # st.session_state.messages.append({"role": "assistant", "content": response})
+        # STEP 2: STATISTICIAN
+        with st.status("🔢 Statistician is calculating...", expanded=False):
+            stats_report, raw_code = run_statistician(inspect_report, "data.csv", prompt)
+            st.write(stats_report)
+            with st.expander("📂 View Statistician's Code"):
+                st.code(raw_code, language="python")
+            
+        # STEP 3: PLOTTER
+        with st.status("🎨 Plotter is visualizing...", expanded=True):
+            # The plotter agent calls execute_python and saves 'temp_plot.png'
+            plot_status, raw_plot_code = run_plotter(stats_report, "data.csv", prompt)
+            st.write(plot_status)
+            with st.expander("📂 View Plotter's Code"):
+                st.code(raw_plot_code, language="python")
+        
+        # --- THE RENDERING MAGIC ---
+        if os.path.exists("temp_plot.png"):
+            # Display the plot in the chat bubble
+            st.image("temp_plot.png", caption="Analysis Visualization")
+            
+            # Save it to session state so it persists on rerun
+            # (We rename it so the next turn doesn't overwrite the UI history)
+            unique_plot_name = f"plot_{int(time.time())}.png"
+            os.rename("temp_plot.png", unique_plot_name)
+            
+            # Final output for history
+            st.session_state.messages.append({
+                "role": "assistant", 
+                "content": stats_report, 
+                "image": unique_plot_name
+            })
+        else:
+            st.markdown(stats_report)
+            st.session_state.messages.append({"role": "assistant", "content": stats_report})
