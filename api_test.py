@@ -10,7 +10,8 @@ import os
 import google.generativeai as genai
 
 # MANUALLY PASTE YOUR KEY HERE (Just for this test!)
-MY_KEY = "AIzaSyAQCA8ID8UhmtBMfMVigUYqMO688lwqi7U" # Your actual API key from Google AI Studio
+# MY_KEY = "AIzaSyAQCA8ID8UhmtBMfMVigUYqMO688lwqi7U" 
+# Your actual API key from Google AI Studio
 
 print("🔗 Attempting manual connection...")
 genai.configure(api_key=MY_KEY)

@@ -10,9 +10,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from io import StringIO
 import sys
-load_dotenv()
+load_dotenv(override=True)
 
 MY_KEY = os.environ.get("GOOGLE_API_KEY")
+print(MY_KEY)
 
 if MY_KEY:
     print("Key loaded successfully!")
@@ -32,7 +33,8 @@ You are a Senior Data Scientist Agent. Your goal is to help the user perform EDA
 
 ### INITIAL MANDATE:
 Your very first action MUST be to use the 'inspect_data' tool to understand the columns and data types.
-ALWAYS write your 'THOUGHT' process in plain text before calling any tool.
+ALWAYS write your 'THOUGHT' process in plain text before calling any tool. 
+NEVER call a tool without writing your 'THOUGHT' process first.
 """
 
 def inspect_data(file_path: str):
@@ -105,7 +107,7 @@ def execute_python(code: str, file_path: str):
 
 # 1. Initialize the Brain (M2-friendly API)
 # Make sure you have: export GOOGLE_API_KEY='your-key-here'
-llm = ChatGoogleGenerativeAI(model="models/gemini-2.5-flash", google_api_key=MY_KEY)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=MY_KEY)
 
 # 2. Bind the Tool to the LLM
 llm_with_tools = llm.bind_tools([inspect_data, calculate_correlation, execute_python])
