@@ -93,6 +93,11 @@ def execute_python(code: str, file_path: str):
         
         # 3. Execute the code
         exec(code, {}, local_vars)
+
+        # If the agent used plt, make sure it actually saved
+        if plt.get_fignums():
+            plt.savefig("temp_plot.png")
+            plt.close()
         
         # Restore stdout and get the results
         sys.stdout = old_stdout
@@ -113,8 +118,8 @@ llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=MY_KEY)
 llm_with_tools = llm.bind_tools([inspect_data, calculate_correlation, execute_python])
 chat_history = [SystemMessage(content=SYSTEM_PROMPT)]
 
-def run_agent(user_query, file_path):
-    chat_history.append(HumanMessage(content=f"{user_query} (Data: {file_path})"))
+def run_agent(user_query, file_path, memory):
+    memory.append(HumanMessage(content=f"{user_query} (Data: {file_path})"))
     # Initialize the State (The Memory)
     # messages = [
     #     ("system", SYSTEM_PROMPT),
@@ -124,9 +129,9 @@ def run_agent(user_query, file_path):
     print(f"🚀 Starting EDA Task: {user_query}")
 
     # The Agentic Loop
-    for i in range(5):  # Safety limit of 5 turns
-        response = llm_with_tools.invoke(chat_history)
-        chat_history.append(response)
+    for i in range(20):  # Safety limit of 5 turns
+        response = llm_with_tools.invoke(memory)
+        memory.append(response)
         has_tool_calls = bool(response.tool_calls)
         content = ""
 
@@ -187,9 +192,11 @@ def run_agent(user_query, file_path):
                 #  user_guidance = input("The data is massive. Which columns/patterns should I focus on? ")
             
             # Feed the result back into the State
-            chat_history.append(ToolMessage(
+            memory.append(ToolMessage(
                 tool_call_id=tool_call['id'],
                 content=str(result)))
+
+    return content, memory
 
 if __name__ == "__main__":
     path = input("📂 Enter CSV path: ")
