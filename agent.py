@@ -10,19 +10,16 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from io import StringIO
 import sys
-# 1. This "wakes up" the .env file
-# load_dotenv() 
+load_dotenv()
 
-# MANUALLY PASTE YOUR KEY HERE (Just for this test!)
-MY_KEY = "AIzaSyAQCA8ID8UhmtBMfMVigUYqMO688lwqi7U" # Your actual API key from Google AI Studio
-
-print("🔗 Attempting manual connection...")
-genai.configure(api_key=MY_KEY)
+MY_KEY = os.environ.get("GOOGLE_API_KEY")
 
 if MY_KEY:
-    print("✅ Key loaded successfully!")
+    print("Key loaded successfully!")
 else:
-    print("❌ Key still missing. Check the filename .env")
+    raise ValueError("GOOGLE_API_KEY not found. Add it to your .env file.")
+
+genai.configure(api_key=MY_KEY)
 
 SYSTEM_PROMPT = """
 You are a Senior Data Scientist Agent. Your goal is to help the user perform EDA on a CSV file.
